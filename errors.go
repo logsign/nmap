@@ -10,6 +10,11 @@ var (
 	// the nmap binary is present in the user's $PATH.
 	ErrNmapNotInstalled = errors.New("nmap binary was not found")
 
+	// ErrSudoNotInstalled means that upon trying to manually locate sudo in the user's path,
+	// it was not found. Either use the WithSudoPath method to set it manually, or make sure that
+	// the sudo binary is present in the user's $PATH.
+	ErrSudoNotInstalled = errors.New("sudo binary was not found")
+
 	// ErrScanTimeout means that the provided context was done before the scanner finished its scan.
 	ErrScanTimeout = errors.New("nmap scan timed out")
 

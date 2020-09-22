@@ -30,6 +30,22 @@ func TestNmapNotInstalled(t *testing.T) {
 	_ = os.Setenv("PATH", oldPath)
 }
 
+func TestSudoNotInstalled(t *testing.T) {
+	oldPath := os.Getenv("PATH")
+	_ = os.Setenv("PATH", "")
+
+	s, err := NewScanner(WithSudo())
+	if err == nil {
+		t.Error("expected NewScanner to fail if sudo is not found in $PATH")
+	}
+
+	if s != nil {
+		t.Error("expected NewScanner to return a nil scanner if sudo is not found in $PATH")
+	}
+
+	_ = os.Setenv("PATH", oldPath)
+}
+
 func TestRun(t *testing.T) {
 	nmapPath, err := exec.LookPath("nmap")
 	if err != nil {
@@ -69,6 +85,18 @@ func TestRun(t *testing.T) {
 
 			expectedErr:      true,
 			expectedWarnings: []string{"EOF"},
+		},
+		{
+			description: "invalid sudo path",
+
+			options: []func(*Scanner){
+				WithTargets("0.0.0.0"),
+				WithSudo(),
+				WithSudoPath("/invalid-sudo"),
+			},
+
+			expectedErr:    true,
+			expectedResult: nil,
 		},
 		{
 			description: "context timeout",
@@ -112,6 +140,21 @@ func TestRun(t *testing.T) {
 			options: []func(*Scanner){
 				WithBinaryPath("tests/scripts/fake_nmap.sh"),
 				WithCustomArguments("tests/xml/scan_error_resolving_name.xml"),
+			},
+
+			expectedErr: true,
+			expectedResult: &Run{
+				Scanner: "fake_nmap",
+				Args:    "nmap test",
+			},
+		},
+		{
+			description: "run with sudo",
+			options: []func(*Scanner){
+				WithSudo(),
+				WithSudoPath("tests/scripts/fake_sudo.sh"),
+				WithBinaryPath("tests/scripts/fake_nmap.sh"),
+				WithCustomArguments("tests/xml/scan_error_other.xml"),
 			},
 
 			expectedErr: true,
@@ -266,6 +309,18 @@ func TestRunAsync(t *testing.T) {
 
 			expectedResult:      nil,
 			expectedRunAsyncErr: errors.New("unable to execute asynchronous nmap run: fork/exec /invalid: no such file or directory"),
+		},
+		{
+			description: "invalid sudo path",
+
+			options: []func(*Scanner){
+				WithTargets("0.0.0.0"),
+				WithSudo(),
+				WithSudoPath("/invalid-sudo"),
+			},
+
+			expectedResult:      nil,
+			expectedRunAsyncErr: errors.New("unable to execute asynchronous nmap run: fork/exec /invalid-sudo: no such file or directory"),
 		},
 		{
 			description: "output can't be parsed",

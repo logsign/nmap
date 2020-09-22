@@ -22,6 +22,8 @@ type Scanner struct {
 
 	args       []string
 	binaryPath string
+	sudoPath   string
+	withSudo   bool
 	ctx        context.Context
 
 	portFilter func(Port) bool
@@ -38,8 +40,16 @@ func NewScanner(options ...func(*Scanner)) (*Scanner, error) {
 		option(scanner)
 	}
 
+	var err error
+
+	if scanner.withSudo && scanner.sudoPath == "" {
+		scanner.sudoPath, err = exec.LookPath("sudo")
+		if err != nil {
+			return nil, ErrSudoNotInstalled
+		}
+	}
+
 	if scanner.binaryPath == "" {
-		var err error
 		scanner.binaryPath, err = exec.LookPath("nmap")
 		if err != nil {
 			return nil, ErrNmapNotInstalled
@@ -64,7 +74,13 @@ func (s *Scanner) Run() (result *Run, warnings []string, err error) {
 	s.args = append(s.args, "-")
 
 	// Prepare nmap process
-	cmd := exec.Command(s.binaryPath, s.args...)
+	var cmd *exec.Cmd
+	if s.withSudo {
+		args := append([]string{s.binaryPath}, s.args...)
+		cmd = exec.Command(s.sudoPath, args...)
+	} else {
+		cmd = exec.Command(s.binaryPath, s.args...)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -147,7 +163,13 @@ func (s *Scanner) RunAsync() error {
 
 	// Get XML output in stdout instead of writing it in a file.
 	s.args = append(s.args, "-")
-	s.cmd = exec.Command(s.binaryPath, s.args...)
+
+	if s.withSudo {
+		args := append([]string{s.binaryPath}, s.args...)
+		s.cmd = exec.Command(s.sudoPath, args...)
+	} else {
+		s.cmd = exec.Command(s.binaryPath, s.args...)
+	}
 
 	stderr, err := s.cmd.StderrPipe()
 	if err != nil {
@@ -223,6 +245,20 @@ func choosePorts(result *Run, filter func(Port) bool) *Run {
 func WithContext(ctx context.Context) func(*Scanner) {
 	return func(s *Scanner) {
 		s.ctx = ctx
+	}
+}
+
+// WithSudo runs nmap with sudo.
+func WithSudo() func(*Scanner) {
+	return func(s *Scanner) {
+		s.withSudo = true
+	}
+}
+
+// WithSudoPath sets the nmap binary path for a scanner.
+func WithSudoPath(sudoPath string) func(*Scanner) {
+	return func(s *Scanner) {
+		s.sudoPath = sudoPath
 	}
 }
 
